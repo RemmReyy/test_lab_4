@@ -5,16 +5,74 @@ on:
   pull_request:
     branches: [ "main" ]
 jobs:
-  integration-tests:
+  unit-tests:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9"]
     steps:
       - name: Check out the repository
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
-          python-version: "3.9"
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run unit tests
+        run: |
+          pytest --cov=app --cov-report=xml --cov-report=term tests/test_case.py
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v3
+        with:
+          name: unit-coverage-report-${{ matrix.python-version }}
+          path: coverage.xml
+
+  bdd-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9"]
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install behave
+
+      - name: Run BDD tests
+        run: |
+          behave features/
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: [unit-tests, bdd-tests]
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9"]
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - name: Install Docker Compose
         run: |
@@ -44,8 +102,8 @@ jobs:
           exit "$exitcode"
       - name: Run integration tests
         run: |
-          pytest --maxfail=1 --disable-warnings -v
-          coverage run -m pytest && coverage report -m
+          pytest --maxfail=1 --disable-warnings -v tests/test_integration.py
+          coverage run -m pytest tests/test_integration.py && coverage report -m
       - name: Teardown Docker
         if: always()
         run: docker-compose down
