@@ -26,6 +26,7 @@ jobs:
           pytest tests/test_case.py --maxfail=1 --disable-warnings -v
 
   bdd-tests:
+    needs: unit-tests
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
@@ -46,6 +47,7 @@ jobs:
           pytest features --maxfail=1 --disable-warnings -v
 
   integration-tests:
+    needs: bdd-tests
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
